@@ -1,24 +1,22 @@
 # util-pdf
 
-```
-              ▲
-              █
-              █
-             ▟█▙
-        ▄▄▄▄▟███▖   ▒▒▒
-      ▟█████████▙  ▒▒▒▒▒
-   ▄▟████ ● ██████▒▒▒▒▒▒
-  ▟███████████████▒▒▒▒▒
-  ▜███▛▀▀   ▟██████▒▒▒▒▒
-   ▀▀      ▟███████▙▒▒▒▒
-          ▟████████▌▒▒▒
-           ▜███████▌▒▒
-            ▜▙▄▄▄▄▟▘
-```
+<p align="center">
+  <img src="assets/banner-util-pdf.jpg" alt="util-pdf" width="640">
+</p>
 
-A small, open-source command-line toolkit for working with PDFs.
+A small, open-source command-line toolkit for working with PDFs — right from your terminal.
 
 It currently supports **merging** PDF files, with an interactive shell mode. This is an early project — more document and PDF operations (splitting, Word ↔ PDF conversion, and more) are planned for upcoming releases.
+
+## Private by design
+
+**Your files never leave your computer.** `util-pdf` runs entirely on your own machine — no servers, no uploads, no tracking.
+
+Most online PDF tools require you to upload your documents to a website you don't control and whose data handling you can't verify. That's a real risk, especially for contracts, IDs, medical records, or anything sensitive. With `util-pdf`, that risk simply doesn't exist:
+
+- **100% local** — every operation runs on your machine, offline.
+- **No uploads** — your documents stay on disk and are never sent anywhere.
+- **Open source** — the code is right here for you to read and audit.
 
 ## Requirements
 

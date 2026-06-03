@@ -3,9 +3,16 @@ from pathlib import Path
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
-from rich.console import Console
+from rich.align import Align
+from rich.box import ROUNDED
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from util_pdf.operations.merge import merge_pdfs
+
+VERSION = "0.1.0"
 
 console = Console()
 
@@ -24,6 +31,30 @@ UNICORN = """\
            [white]▜███████▌[/white][deep_pink2]▒▒[/deep_pink2]
             [white]▜▙▄▄▄▄▟▘[/white]
 """
+
+SIDE_INFO = """\
+[bold]Open-source PDF toolkit[/bold]
+[dim]for your terminal.[/dim]
+
+[cyan]merge[/cyan]   [dim]Merge PDFs into one[/dim]
+[cyan]help[/cyan]    [dim]Show all commands[/dim]
+[cyan]exit[/cyan]    [dim]Quit[/dim]\
+"""
+
+
+def _banner() -> Panel:
+    grid = Table.grid(padding=(0, 4))
+    grid.add_column()
+    grid.add_column(vertical="middle")
+    grid.add_row(Text.from_markup(UNICORN.rstrip("\n")), Text.from_markup(SIDE_INFO))
+
+    body = Group(
+        grid,
+        Text(""),
+        Align.center(Text.from_markup(f"[bold]util-pdf[/bold] [dim]v{VERSION}[/dim]")),
+    )
+    return Panel(body, box=ROUNDED, border_style="grey37", padding=(1, 3))
+
 
 HELP = """\
 [bold]Commands:[/bold]
@@ -84,9 +115,8 @@ COMMANDS = {
 
 
 def start_shell() -> None:
-    console.print(UNICORN)
-    console.print("[bold]util-pdf[/bold] [dim]v0.1.0[/dim]")
-    console.print("[dim]Type 'help' for available commands. Ctrl+C or 'exit' to quit.[/dim]\n")
+    console.print(_banner())
+    console.print()
 
     session: PromptSession[str] = PromptSession(history=InMemoryHistory())
 
