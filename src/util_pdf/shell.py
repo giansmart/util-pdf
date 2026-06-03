@@ -10,13 +10,19 @@ from util_pdf.operations.merge import merge_pdfs
 console = Console()
 
 UNICORN = """\
-[blue]       ▄▟[/blue]
-[green]      ▟[/green] [white]█[/white]
-[white]   ▗▄[/white][yellow]▟[/yellow]  [hot_pink]█▄▄[/hot_pink]
-[white]  ▐ [/white][grey42]●[/grey42][white] ▌[/white]   [hot_pink]▜▒▒▒[/hot_pink]
-[white]  ▐   ▌[/white]    [deep_pink2]▒▒▒▒[/deep_pink2]
-[white]   ▜▄▄▙▄▄▄▟[/white][deep_pink2]▒▒▒[/deep_pink2]
-[white]        ██[/white]
+[red]              ▲[/red]
+[orange1]              █[/orange1]
+[yellow]              █[/yellow]
+             [green]▟[/green][cyan]█[/cyan][blue]▙[/blue]
+        [white]▄▄▄▄▟███▖[/white]   [hot_pink]▒▒▒[/hot_pink]
+      [white]▟█████████▙[/white]  [hot_pink]▒▒▒▒▒[/hot_pink]
+   [white]▄▟████[/white] [grey42]●[/grey42] [white]██████[/white][hot_pink]▒▒▒▒▒▒[/hot_pink]
+  [white]▟███████████████[/white][hot_pink]▒▒▒▒▒[/hot_pink]
+  [white]▜███▛▀▀   ▟██████[/white][deep_pink2]▒▒▒▒▒[/deep_pink2]
+   [white]▀▀      ▟███████▙[/white][deep_pink2]▒▒▒▒[/deep_pink2]
+          [white]▟████████▌[/white][deep_pink2]▒▒▒[/deep_pink2]
+           [white]▜███████▌[/white][deep_pink2]▒▒[/deep_pink2]
+            [white]▜▙▄▄▄▄▟▘[/white]
 """
 
 HELP = """\
