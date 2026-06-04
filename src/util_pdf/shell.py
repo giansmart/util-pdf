@@ -1,4 +1,6 @@
 import shlex
+import shutil
+import tempfile
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
@@ -10,7 +12,12 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from util_pdf.operations.merge import merge_pdfs
+from util_pdf.operations.convert import (
+    WORD_EXTENSIONS,
+    ConversionError,
+    convert_to_pdf,
+)
+from util_pdf.operations.merge import SUPPORTED_EXTENSIONS, merge_documents
 
 VERSION = "0.1.0"
 
@@ -36,9 +43,10 @@ SIDE_INFO = """\
 [bold]Open-source PDF toolkit[/bold]
 [dim]for your terminal.[/dim]
 
-[cyan]merge[/cyan]   [dim]Merge PDFs into one[/dim]
-[cyan]help[/cyan]    [dim]Show all commands[/dim]
-[cyan]exit[/cyan]    [dim]Quit[/dim]\
+[cyan]merge[/cyan]     [dim]Merge PDFs / Word docs[/dim]
+[cyan]convert[/cyan]   [dim]Word (.docx) to PDF[/dim]
+[cyan]help[/cyan]      [dim]Show all commands[/dim]
+[cyan]exit[/cyan]      [dim]Quit[/dim]\
 """
 
 
@@ -58,9 +66,10 @@ def _banner() -> Panel:
 
 HELP = """\
 [bold]Commands:[/bold]
-  [cyan]merge[/cyan] <file1.pdf> <file2.pdf> [...] [-o output.pdf]   Merge PDFs into one
-  [cyan]help[/cyan]                                                   Show this message
-  [cyan]exit[/cyan]                                                   Quit
+  [cyan]merge[/cyan] <file1> <file2> [...] [-o output.pdf]   Merge PDFs/Word docs into one PDF
+  [cyan]convert[/cyan] <file.docx> [-o output.pdf]           Convert a Word doc to PDF
+  [cyan]help[/cyan]                                           Show this message
+  [cyan]exit[/cyan]                                           Quit
 """
 
 
@@ -80,7 +89,7 @@ def _parse_merge(args: list[str]) -> tuple[list[Path], Path]:
 
 def _cmd_merge(args: list[str]) -> None:
     if not args:
-        console.print("[red]Usage:[/red] merge <file1.pdf> <file2.pdf> [...] [-o output.pdf]")
+        console.print("[red]Usage:[/red] merge <file1> <file2> [...] [-o output.pdf]")
         return
 
     try:
@@ -99,18 +108,77 @@ def _cmd_merge(args: list[str]) -> None:
             console.print(f"[red]Error:[/red] File not found: {f}")
         return
 
-    non_pdf = [f for f in files if f.suffix.lower() != ".pdf"]
-    if non_pdf:
-        for f in non_pdf:
-            console.print(f"[red]Error:[/red] Not a PDF: {f}")
+    unsupported = [f for f in files if f.suffix.lower() not in SUPPORTED_EXTENSIONS]
+    if unsupported:
+        for f in unsupported:
+            console.print(f"[red]Error:[/red] Unsupported file type: {f}")
+        console.print("[dim]Supported: .pdf, .docx, .doc[/dim]")
         return
 
-    total = merge_pdfs(files, output)
+    try:
+        with console.status("Merging..."):
+            total = merge_documents(files, output)
+    except ConversionError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        return
+
     console.print(f"[green]Done.[/green] {total} pages → [bold]{output}[/bold]")
+
+
+def _cmd_convert(args: list[str]) -> None:
+    if not args:
+        console.print("[red]Usage:[/red] convert <file.docx> [-o output.pdf]")
+        return
+
+    file: Path | None = None
+    output: Path | None = None
+    i = 0
+    try:
+        while i < len(args):
+            if args[i] in ("-o", "--output"):
+                i += 1
+                output = Path(args[i])
+            elif file is None:
+                file = Path(args[i])
+            else:
+                console.print(f"[red]Error:[/red] Unexpected argument: {args[i]}")
+                return
+            i += 1
+    except IndexError:
+        console.print("[red]Error:[/red] Missing value for -o option.")
+        return
+
+    if file is None:
+        console.print("[red]Usage:[/red] convert <file.docx> [-o output.pdf]")
+        return
+
+    if not file.exists():
+        console.print(f"[red]Error:[/red] File not found: {file}")
+        return
+
+    if file.suffix.lower() not in WORD_EXTENSIONS:
+        console.print(f"[red]Error:[/red] Not a Word document: {file}")
+        console.print("[dim]Supported: .docx, .doc[/dim]")
+        return
+
+    out_path = output or file.with_suffix(".pdf")
+
+    try:
+        with console.status("Converting..."):
+            with tempfile.TemporaryDirectory() as tmp:
+                produced = convert_to_pdf(file, Path(tmp))
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(produced), str(out_path))
+    except ConversionError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        return
+
+    console.print(f"[green]Done.[/green] → [bold]{out_path}[/bold]")
 
 
 COMMANDS = {
     "merge": _cmd_merge,
+    "convert": _cmd_convert,
 }
 
 
