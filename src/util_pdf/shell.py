@@ -1,6 +1,4 @@
 import shlex
-import shutil
-import tempfile
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
@@ -12,12 +10,8 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from util_pdf.operations.convert import (
-    WORD_EXTENSIONS,
-    ConversionError,
-    convert_to_pdf,
-)
-from util_pdf.operations.merge import SUPPORTED_EXTENSIONS, merge_documents
+from util_pdf.operations import service
+from util_pdf.operations.errors import UtilPdfError
 
 VERSION = "0.1.0"
 
@@ -43,10 +37,11 @@ SIDE_INFO = """\
 [bold]Open-source PDF toolkit[/bold]
 [dim]for your terminal.[/dim]
 
-[cyan]merge[/cyan]     [dim]Merge PDFs / Word docs[/dim]
-[cyan]convert[/cyan]   [dim]Word (.docx) to PDF[/dim]
-[cyan]help[/cyan]      [dim]Show all commands[/dim]
-[cyan]exit[/cyan]      [dim]Quit[/dim]\
+[cyan]merge[/cyan]          [dim]Merge PDFs / Word docs[/dim]
+[cyan]convert[/cyan]        [dim]Word (.docx) to PDF[/dim]
+[cyan]remove-pages[/cyan]   [dim]Remove pages from a PDF[/dim]
+[cyan]help[/cyan]           [dim]Show all commands[/dim]
+[cyan]exit[/cyan]           [dim]Quit[/dim]\
 """
 
 
@@ -66,11 +61,19 @@ def _banner() -> Panel:
 
 HELP = """\
 [bold]Commands:[/bold]
-  [cyan]merge[/cyan] <file1> <file2> [...] [-o output.pdf]   Merge PDFs/Word docs into one PDF
-  [cyan]convert[/cyan] <file.docx> [-o output.pdf]           Convert a Word doc to PDF
-  [cyan]help[/cyan]                                           Show this message
-  [cyan]exit[/cyan]                                           Quit
+  [cyan]merge[/cyan] <file1> <file2> [...] [-o output.pdf]     Merge PDFs/Word docs into one PDF
+  [cyan]convert[/cyan] <file.docx> [-o output.pdf]             Convert a Word doc to PDF
+  [cyan]remove-pages[/cyan] <file.pdf> -p <pages> [-o out.pdf] Remove pages (e.g. -p 3,5-7)
+  [cyan]help[/cyan]                                             Show this message
+  [cyan]exit[/cyan]                                             Quit
 """
+
+
+def _print_error(error: UtilPdfError) -> None:
+    for message in error.messages:
+        console.print(f"[red]Error:[/red] {message}")
+    if error.hint:
+        console.print(f"[dim]{error.hint}[/dim]")
 
 
 def _parse_merge(args: list[str]) -> tuple[list[Path], Path]:
@@ -98,31 +101,14 @@ def _cmd_merge(args: list[str]) -> None:
         console.print("[red]Error:[/red] Missing value for -o option.")
         return
 
-    if len(files) < 2:
-        console.print("[red]Error:[/red] At least 2 files required.")
-        return
-
-    missing = [f for f in files if not f.exists()]
-    if missing:
-        for f in missing:
-            console.print(f"[red]Error:[/red] File not found: {f}")
-        return
-
-    unsupported = [f for f in files if f.suffix.lower() not in SUPPORTED_EXTENSIONS]
-    if unsupported:
-        for f in unsupported:
-            console.print(f"[red]Error:[/red] Unsupported file type: {f}")
-        console.print("[dim]Supported: .pdf, .docx, .doc[/dim]")
-        return
-
     try:
         with console.status("Merging..."):
-            total = merge_documents(files, output)
-    except ConversionError as e:
-        console.print(f"[red]Error:[/red] {e}")
+            result = service.merge(files, output)
+    except UtilPdfError as e:
+        _print_error(e)
         return
 
-    console.print(f"[green]Done.[/green] {total} pages → [bold]{output}[/bold]")
+    console.print(f"[green]Done.[/green] {result.pages} pages → [bold]{result.output}[/bold]")
 
 
 def _cmd_convert(args: list[str]) -> None:
@@ -152,33 +138,64 @@ def _cmd_convert(args: list[str]) -> None:
         console.print("[red]Usage:[/red] convert <file.docx> [-o output.pdf]")
         return
 
-    if not file.exists():
-        console.print(f"[red]Error:[/red] File not found: {file}")
-        return
-
-    if file.suffix.lower() not in WORD_EXTENSIONS:
-        console.print(f"[red]Error:[/red] Not a Word document: {file}")
-        console.print("[dim]Supported: .docx, .doc[/dim]")
-        return
-
-    out_path = output or file.with_suffix(".pdf")
-
     try:
         with console.status("Converting..."):
-            with tempfile.TemporaryDirectory() as tmp:
-                produced = convert_to_pdf(file, Path(tmp))
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(produced), str(out_path))
-    except ConversionError as e:
-        console.print(f"[red]Error:[/red] {e}")
+            result = service.convert(file, output)
+    except UtilPdfError as e:
+        _print_error(e)
         return
 
-    console.print(f"[green]Done.[/green] → [bold]{out_path}[/bold]")
+    console.print(f"[green]Done.[/green] → [bold]{result.output}[/bold]")
+
+
+def _cmd_remove_pages(args: list[str]) -> None:
+    if not args:
+        console.print("[red]Usage:[/red] remove-pages <file.pdf> -p <pages> [-o output.pdf]")
+        return
+
+    file: Path | None = None
+    pages_spec: str | None = None
+    output: Path | None = None
+    i = 0
+    try:
+        while i < len(args):
+            if args[i] in ("-p", "--pages"):
+                i += 1
+                pages_spec = args[i]
+            elif args[i] in ("-o", "--output"):
+                i += 1
+                output = Path(args[i])
+            elif file is None:
+                file = Path(args[i])
+            else:
+                console.print(f"[red]Error:[/red] Unexpected argument: {args[i]}")
+                return
+            i += 1
+    except IndexError:
+        console.print(f"[red]Error:[/red] Missing value for {args[i - 1]} option.")
+        return
+
+    if file is None or pages_spec is None:
+        console.print("[red]Usage:[/red] remove-pages <file.pdf> -p <pages> [-o output.pdf]")
+        return
+
+    try:
+        with console.status("Removing pages..."):
+            result = service.remove_pages(file, pages_spec, output)
+    except UtilPdfError as e:
+        _print_error(e)
+        return
+
+    console.print(
+        f"[green]Done.[/green] Removed {result.pages_removed} page(s), "
+        f"{result.pages_remaining} remaining → [bold]{result.output}[/bold]"
+    )
 
 
 COMMANDS = {
     "merge": _cmd_merge,
     "convert": _cmd_convert,
+    "remove-pages": _cmd_remove_pages,
 }
 
 
